@@ -8,6 +8,6 @@ namespace SalonBookingApp.DTOs
         public int CustomerId { get; set; }
         public int StylistId { get; set; }
         public int ServiceId { get; set; }
-        public string Notes { get; set; }
+        public string? Notes { get; set; }
     }
 }
