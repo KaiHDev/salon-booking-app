@@ -30,7 +30,6 @@ namespace SalonBookingApp.Controllers
                 .Include(b => b.Service)
                 .ToListAsync();
 
-            // Map EF entities to DTOs
             var bookingDtos = bookings.Select(b => new BookingDto
             {
                 Id = b.Id,
@@ -137,17 +136,71 @@ namespace SalonBookingApp.Controllers
             return NoContent();
         }
 
-        // DELETE: api/booking/{id}
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteBooking(int id)
+        // PUT: api/booking/{id}/reschedule
+        [HttpPut("{id}/reschedule")]
+        public async Task<IActionResult> RescheduleBooking(int id, [FromBody] BookingRescheduleDto dto)
         {
             var booking = await _context.Bookings.FindAsync(id);
             if (booking == null)
                 return NotFound();
 
-            _context.Bookings.Remove(booking);
-            await _context.SaveChangesAsync();
+            booking.DateTime = dto.NewDateTime;
+            booking.Status = BookingStatus.Rescheduled;
+            booking.LastModifiedDate = DateTime.UtcNow;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Bookings.Any(b => b.Id == id))
+                    return NotFound();
+                throw;
+            }
+
             return NoContent();
+        }
+
+        // PUT: api/booking/{id}/cancel
+        [HttpPut("{id}/cancel")]
+        public async Task<IActionResult> CancelBooking(int id, [FromBody] BookingCancelDto dto)
+        {
+            var booking = await _context.Bookings.FindAsync(id);
+            if (booking == null)
+                return NotFound();
+
+            booking.Status = BookingStatus.Cancelled;
+            booking.CancellationReason = dto.CancellationReason;
+            booking.LastModifiedDate = DateTime.UtcNow;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!_context.Bookings.Any(b => b.Id == id))
+                    return NotFound();
+                throw;
+            }
+
+            return NoContent();
+        }
+
+        // GET: api/booking/{id}/emaillogs
+        [HttpGet("{id}/emaillogs")]
+        public async Task<ActionResult<IEnumerable<EmailLog>>> GetBookingEmailLogs(int id)
+        {
+            // Optionally, verify that the booking exists first
+            if (!await _context.Bookings.AnyAsync(b => b.Id == id))
+                return NotFound();
+
+            var emailLogs = await _context.EmailLogs
+                .Where(el => el.BookingId == id)
+                .ToListAsync();
+
+            return Ok(emailLogs);
         }
     }
 }
