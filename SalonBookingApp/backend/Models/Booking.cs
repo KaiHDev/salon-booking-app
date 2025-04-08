@@ -13,7 +13,6 @@ namespace SalonBookingApp.Models
         public int StylistId { get; set; }
         public int ServiceId { get; set; }
 
-        // Navigation properties – using null-forgiving operator since EF will populate these.
         public Customer Customer { get; set; } = null!;
         public Stylist Stylist { get; set; } = null!;
         public Service Service { get; set; } = null!;

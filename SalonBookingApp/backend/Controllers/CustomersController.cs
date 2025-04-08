@@ -61,11 +61,9 @@ namespace SalonBookingApp.Controllers
             if (customer == null)
                 return NotFound();
 
-            // Update fields using the DTO values.
             customer.FullName = dto.FullName;
             customer.Email = dto.Email;
 
-            // Save changes
             await _context.SaveChangesAsync();
 
             return NoContent();

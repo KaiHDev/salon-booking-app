@@ -87,7 +87,6 @@ namespace SalonBookingApp.Controllers
             _context.Bookings.Add(booking);
             await _context.SaveChangesAsync();
 
-            // Re-fetch the created booking with related data (or use your previously added data if you prefer)
             var createdBooking = await _context.Bookings
                 .Include(b => b.Customer)
                 .Include(b => b.Stylist)
