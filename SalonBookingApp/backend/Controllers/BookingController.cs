@@ -3,10 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using SalonBookingApp.Data;
 using SalonBookingApp.DTOs;
 using SalonBookingApp.Models;
+using SalonBookingApp.Services;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System;
 
 namespace SalonBookingApp.Controllers
 {
@@ -15,9 +16,12 @@ namespace SalonBookingApp.Controllers
     public class BookingController : ControllerBase
     {
         private readonly AppDbContext _context;
-        public BookingController(AppDbContext context)
+        private readonly IEmailService _emailService;
+
+        public BookingController(AppDbContext context, IEmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
         }
 
         // GET: api/booking
@@ -103,7 +107,6 @@ namespace SalonBookingApp.Controllers
                 StylistName = createdBooking.Stylist?.Name ?? string.Empty,
                 ServiceName = createdBooking.Service?.Name ?? string.Empty
             };
-
             return CreatedAtAction(nameof(GetBooking), new { id = resultDto.Id }, resultDto);
         }
 
@@ -136,17 +139,20 @@ namespace SalonBookingApp.Controllers
             return NoContent();
         }
 
-        // PUT: api/booking/{id}/reschedule
         [HttpPut("{id}/reschedule")]
         public async Task<IActionResult> RescheduleBooking(int id, [FromBody] BookingRescheduleDto dto)
         {
             var booking = await _context.Bookings.FindAsync(id);
-            if (booking == null)
-                return NotFound();
+            if (booking == null) return NotFound();
 
             booking.DateTime = dto.NewDateTime;
             booking.Status = BookingStatus.Rescheduled;
             booking.LastModifiedDate = DateTime.UtcNow;
+
+            if (!string.IsNullOrEmpty(dto.Reason))
+            {
+                booking.Notes = "Reschedule reason: " + dto.Reason;
+            }
 
             try
             {
@@ -157,6 +163,17 @@ namespace SalonBookingApp.Controllers
                 if (!_context.Bookings.Any(b => b.Id == id))
                     return NotFound();
                 throw;
+            }
+
+            // Trigger email notification for reschedule
+            var customerEmail = (await _context.Customers.FindAsync(booking.CustomerId))?.Email;
+            if (!string.IsNullOrEmpty(customerEmail))
+            {
+                await _emailService.SendEmailAsync(
+                    customerEmail,
+                    "Your appointment has been rescheduled",
+                    $"Your appointment has been rescheduled to {booking.DateTime}."
+                );
             }
 
             return NoContent();
@@ -185,6 +202,17 @@ namespace SalonBookingApp.Controllers
                 throw;
             }
 
+            // Trigger cancellation email notification
+            var customerEmail = (await _context.Customers.FindAsync(booking.CustomerId))?.Email;
+            if (!string.IsNullOrEmpty(customerEmail))
+            {
+                await _emailService.SendEmailAsync(
+                    customerEmail,
+                    "Your appointment has been cancelled",
+                    $"Your appointment scheduled on {booking.DateTime} has been cancelled. Reason: {dto.CancellationReason}."
+                );
+            }
+
             return NoContent();
         }
 
@@ -192,7 +220,6 @@ namespace SalonBookingApp.Controllers
         [HttpGet("{id}/emaillogs")]
         public async Task<ActionResult<IEnumerable<EmailLog>>> GetBookingEmailLogs(int id)
         {
-            // Optionally, verify that the booking exists first
             if (!await _context.Bookings.AnyAsync(b => b.Id == id))
                 return NotFound();
 
