@@ -11,20 +11,32 @@ using System.Threading.Tasks;
 
 namespace SalonBookingApp.Controllers
 {
+    /// <summary>
+    /// API controller for managing bookings.
+    /// </summary>
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion("1.0")]
     public class BookingController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
 
+        /// <summary>
+        /// Constructor for BookingController.
+        /// </summary>
+        /// <param name="context">The application's database context.</param>
+        /// <param name="emailService">The email service used for sending notifications.</param>
         public BookingController(AppDbContext context, IEmailService emailService)
         {
             _context = context;
             _emailService = emailService;
         }
 
-        // GET: api/booking
+        /// <summary>
+        /// Gets all bookings.
+        /// </summary>
+        /// <returns>A list of booking DTOs.</returns>
         [HttpGet]
         public async Task<ActionResult<IEnumerable<BookingDto>>> GetBookings()
         {
@@ -46,7 +58,11 @@ namespace SalonBookingApp.Controllers
             return Ok(bookingDtos);
         }
 
-        // GET: api/booking/{id}
+        /// <summary>
+        /// Gets a booking by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the booking.</param>
+        /// <returns>A booking DTO if found; otherwise, 404 Not Found.</returns>
         [HttpGet("{id}")]
         public async Task<ActionResult<BookingDto>> GetBooking(int id)
         {
@@ -55,7 +71,6 @@ namespace SalonBookingApp.Controllers
                 .Include(b => b.Stylist)
                 .Include(b => b.Service)
                 .FirstOrDefaultAsync(b => b.Id == id);
-
             if (booking == null)
                 return NotFound();
 
@@ -67,11 +82,14 @@ namespace SalonBookingApp.Controllers
                 StylistName = booking.Stylist?.Name ?? string.Empty,
                 ServiceName = booking.Service?.Name ?? string.Empty
             };
-
             return Ok(dto);
         }
 
-        // POST: api/booking
+        /// <summary>
+        /// Creates a new booking.
+        /// </summary>
+        /// <param name="dto">A DTO containing the necessary booking information.</param>
+        /// <returns>The created booking DTO.</returns>
         [HttpPost]
         public async Task<ActionResult<BookingDto>> CreateBooking([FromBody] BookingCreateDto dto)
         {
@@ -110,7 +128,12 @@ namespace SalonBookingApp.Controllers
             return CreatedAtAction(nameof(GetBooking), new { id = resultDto.Id }, resultDto);
         }
 
-        // PUT: api/booking/{id}
+        /// <summary>
+        /// Updates an existing booking.
+        /// </summary>
+        /// <param name="id">The ID of the booking to update.</param>
+        /// <param name="dto">A DTO containing the updated booking information.</param>
+        /// <returns>No content if successful; otherwise, an error status.</returns>
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateBooking(int id, [FromBody] BookingCreateDto dto)
         {
@@ -139,20 +162,22 @@ namespace SalonBookingApp.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Reschedules an existing booking.
+        /// </summary>
+        /// <param name="id">The ID of the booking to reschedule.</param>
+        /// <param name="dto">A DTO containing the new appointment date and an optional reason.</param>
+        /// <returns>No content if successful; otherwise, an error status.</returns>
         [HttpPut("{id}/reschedule")]
         public async Task<IActionResult> RescheduleBooking(int id, [FromBody] BookingRescheduleDto dto)
         {
             var booking = await _context.Bookings.FindAsync(id);
-            if (booking == null) return NotFound();
+            if (booking == null)
+                return NotFound();
 
             booking.DateTime = dto.NewDateTime;
             booking.Status = BookingStatus.Rescheduled;
             booking.LastModifiedDate = DateTime.UtcNow;
-
-            if (!string.IsNullOrEmpty(dto.Reason))
-            {
-                booking.Notes = "Reschedule reason: " + dto.Reason;
-            }
 
             try
             {
@@ -165,21 +190,26 @@ namespace SalonBookingApp.Controllers
                 throw;
             }
 
-            // Trigger email notification for reschedule
+            // Send reschedule email
             var customerEmail = (await _context.Customers.FindAsync(booking.CustomerId))?.Email;
             if (!string.IsNullOrEmpty(customerEmail))
             {
                 await _emailService.SendEmailAsync(
                     customerEmail,
                     "Your appointment has been rescheduled",
-                    $"Your appointment has been rescheduled to {booking.DateTime}."
+                    $"Your appointment has been rescheduled to {booking.DateTime}. {(string.IsNullOrEmpty(dto.Reason) ? "" : "Reason: " + dto.Reason)}"
                 );
             }
 
             return NoContent();
         }
 
-        // PUT: api/booking/{id}/cancel
+        /// <summary>
+        /// Cancels an existing booking.
+        /// </summary>
+        /// <param name="id">The ID of the booking to cancel.</param>
+        /// <param name="dto">A DTO containing the cancellation reason.</param>
+        /// <returns>No content if successful; otherwise, an error status.</returns>
         [HttpPut("{id}/cancel")]
         public async Task<IActionResult> CancelBooking(int id, [FromBody] BookingCancelDto dto)
         {
@@ -202,21 +232,25 @@ namespace SalonBookingApp.Controllers
                 throw;
             }
 
-            // Trigger cancellation email notification
+            // Send cancellation email
             var customerEmail = (await _context.Customers.FindAsync(booking.CustomerId))?.Email;
             if (!string.IsNullOrEmpty(customerEmail))
             {
                 await _emailService.SendEmailAsync(
                     customerEmail,
                     "Your appointment has been cancelled",
-                    $"Your appointment scheduled on {booking.DateTime} has been cancelled. Reason: {dto.CancellationReason}."
+                    $"Your appointment scheduled for {booking.DateTime} has been cancelled. Reason: {dto.CancellationReason}"
                 );
             }
 
             return NoContent();
         }
 
-        // GET: api/booking/{id}/emaillogs
+        /// <summary>
+        /// Retrieves the email log for a specific booking.
+        /// </summary>
+        /// <param name="id">The ID of the booking for which to retrieve email logs.</param>
+        /// <returns>A list of email logs related to the booking.</returns>
         [HttpGet("{id}/emaillogs")]
         public async Task<ActionResult<IEnumerable<EmailLog>>> GetBookingEmailLogs(int id)
         {
