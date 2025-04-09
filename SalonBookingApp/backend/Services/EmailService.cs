@@ -37,7 +37,7 @@ namespace SalonBookingApp.Services
             using var smtp = new SmtpClient();
             // The SMTP settings can be stored in appsettings.json under EmailSettings
             var smtpServer = _configuration["EmailSettings:SmtpServer"];
-            var smtpPort = int.Parse(_configuration["EmailSettings:SmtpPort"]);
+            var smtpPort = int.Parse(_configuration["EmailSettings:SmtpPort"] ?? "2525");
             var smtpUser = _configuration["EmailSettings:SmtpUser"];
             var smtpPass = _configuration["EmailSettings:SmtpPass"];
 
