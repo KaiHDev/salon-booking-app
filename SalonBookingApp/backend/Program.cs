@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SalonBookingApp.Data;
+using SalonBookingApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,8 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod()
             .AllowAnyHeader());
 });
+
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
